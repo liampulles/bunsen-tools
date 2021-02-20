@@ -16,7 +16,7 @@ func main() {
 		fmt.Println(err)
 	}
 	formatted := format(data)
-	fmt.Println(formatted)
+	fmt.Print(formatted)
 	os.Exit(0)
 }
 
@@ -40,21 +40,30 @@ type currentTrack struct {
 }
 
 func format(data *clementineState) string {
-	return fmt.Sprintf(`
-C L E M E N T I N E
-${hr}${image %s -p 0,135 -s 200x200}${voffset 200}
-Title:${alignr}%s
-Artists:${alignr}%s
-Album:${alignr}%s
-Genre:${alignr}%s
-Playtime:${alignr}%s / %s`,
-		asPath(data.CurrentTrack.ArtURL),
-		scroll(data.CurrentTrack.Title, 20),
-		scroll(strings.Join(data.CurrentTrack.Artists, " "), 20),
-		scroll(data.CurrentTrack.Album, 20),
-		scroll(strings.Join(data.CurrentTrack.Genres, " "), 20),
-		asTimecode(data.CurrentTrack.Position), asTimecode(data.CurrentTrack.Length),
-	)
+	r := "\nC L E M E N T I N E\n"
+	addArt(&r, data)
+	addTrackInfo(&r, "Title", data.CurrentTrack.Title)
+	addTrackInfo(&r, "Artists", strings.Join(data.CurrentTrack.Artists, " "))
+	addTrackInfo(&r, "Album", data.CurrentTrack.Album)
+	addTrackInfo(&r, "Genres", strings.Join(data.CurrentTrack.Genres, " "))
+	addTrackInfo(&r, "Playtime", fmt.Sprintf("%s / %s", asTimecode(data.CurrentTrack.Position), asTimecode(data.CurrentTrack.Length)))
+	return r
+}
+
+func addArt(to *string, data *clementineState) {
+	if data.CurrentTrack.ArtURL == "" {
+		return
+	}
+	*to += fmt.Sprintf("${hr}${image %s -p 0,135 -s 200x200}${voffset 200}\n",
+		asPath(data.CurrentTrack.ArtURL))
+}
+
+func addTrackInfo(to *string, name string, data string) {
+	if data == "" {
+		return
+	}
+	*to += fmt.Sprintf("%s:${alignr}%s\n",
+		name, scroll(data, 20))
 }
 
 func getData() (*clementineState, error) {
