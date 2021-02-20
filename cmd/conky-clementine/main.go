@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -41,12 +42,13 @@ type currentTrack struct {
 func format(data *clementineState) string {
 	return fmt.Sprintf(`
 C L E M E N T I N E
-${hr}
+${hr}${image %s -p 0,185 -s 200x200}${voffset 200}
 Title:${alignr}%s
 Artists:${alignr}%s
 Album:${alignr}%s
 Genre:${alignr}%s
 Playtime:${alignr}%s / %s`,
+		asPath(data.CurrentTrack.ArtURL),
 		scroll(data.CurrentTrack.Title, 20),
 		scroll(strings.Join(data.CurrentTrack.Artists, " "), 20),
 		scroll(data.CurrentTrack.Album, 20),
@@ -118,6 +120,11 @@ func scroll(val string, l int64) string {
 	repeated = repeated + repeated
 	repeated = repeated + repeated
 	unix := time.Now().Unix()
-	step := unix % l
+	step := unix % (l + 2)
 	return repeated[step : l+step]
+}
+
+func asPath(fileURL string) string {
+	p, _ := url.Parse(fileURL)
+	return p.Path
 }
