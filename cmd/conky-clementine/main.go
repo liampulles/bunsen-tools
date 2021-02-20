@@ -42,7 +42,7 @@ type currentTrack struct {
 func format(data *clementineState) string {
 	return fmt.Sprintf(`
 C L E M E N T I N E
-${hr}${image %s -p 0,185 -s 200x200}${voffset 200}
+${hr}${image %s -p 0,135 -s 200x200}${voffset 200}
 Title:${alignr}%s
 Artists:${alignr}%s
 Album:${alignr}%s
@@ -86,18 +86,18 @@ func getCurrentTrack(conn *dbus.Conn) (*currentTrack, error) {
 	}
 
 	return &currentTrack{
-		Title:       metadata["xesam:title"].Value().(string),
-		Album:       metadata["xesam:album"].Value().(string),
-		Artists:     metadata["xesam:artist"].Value().([]string),
-		Genres:      metadata["xesam:genre"].Value().([]string),
-		TrackNumber: metadata["xesam:trackNumber"].Value().(int32),
-		DiscNumber:  metadata["xesam:discNumber"].Value().(int32),
-		Year:        metadata["year"].Value().(int32),
+		Title:       safeAsString(metadata["xesam:title"].Value()),
+		Album:       safeAsString(metadata["xesam:album"].Value()),
+		Artists:     safeAsStringSlice(metadata["xesam:artist"].Value()),
+		Genres:      safeAsStringSlice(metadata["xesam:genre"].Value()),
+		TrackNumber: safeAsInt32(metadata["xesam:trackNumber"].Value()),
+		DiscNumber:  safeAsInt32(metadata["xesam:discNumber"].Value()),
+		Year:        safeAsInt32(metadata["year"].Value()),
 
 		Position: position,
-		Length:   metadata["mpris:length"].Value().(int64),
+		Length:   safeAsInt64(metadata["mpris:length"].Value()),
 
-		ArtURL: metadata["mpris:artUrl"].Value().(string),
+		ArtURL: safeAsString(metadata["mpris:artUrl"].Value()),
 	}, nil
 }
 
@@ -116,15 +116,43 @@ func scroll(val string, l int64) string {
 	if int64(len(val)) < l {
 		return val
 	}
-	repeated := val + "  "
+	repeated := val + " | "
 	repeated = repeated + repeated
 	repeated = repeated + repeated
 	unix := time.Now().Unix()
-	step := unix % (l + 2)
+	step := unix % int64(len(repeated)/2)
 	return repeated[step : l+step]
 }
 
 func asPath(fileURL string) string {
 	p, _ := url.Parse(fileURL)
 	return p.Path
+}
+
+func safeAsStringSlice(in interface{}) []string {
+	if in == nil {
+		return nil
+	}
+	return in.([]string)
+}
+
+func safeAsString(in interface{}) string {
+	if in == nil {
+		return ""
+	}
+	return in.(string)
+}
+
+func safeAsInt32(in interface{}) int32 {
+	if in == nil {
+		return 0
+	}
+	return in.(int32)
+}
+
+func safeAsInt64(in interface{}) int64 {
+	if in == nil {
+		return 0
+	}
+	return in.(int64)
 }
