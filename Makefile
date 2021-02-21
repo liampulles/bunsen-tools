@@ -8,7 +8,7 @@ test: build
 	go test ./test/...
 build:
 	go build ./...
-	rm -f ./conky-clementine
+	rm -f ./conky-mpd
 install: build
 	go install ./...
 inspect: build
@@ -18,5 +18,5 @@ update:
 pre-commit: update clean coverage.txt inspect
 	go mod tidy
 clean:
-	rm -f ${GOBIN}/conky-clementine
+	rm -f ${GOBIN}/conky-mpd
 	rm -f coverage.txt
