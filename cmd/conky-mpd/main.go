@@ -22,10 +22,13 @@ func main() {
 }
 
 type mpdState struct {
-	CurrentTrack currentTrack
+	Tracks []track
+
+	CurrentIdx     int64
+	CurrentElapsed float64
 }
 
-type currentTrack struct {
+type track struct {
 	Title       string
 	Album       string
 	Artist      string
@@ -33,11 +36,8 @@ type currentTrack struct {
 	TrackNumber int64
 	DiscNumber  int64
 	Year        string
-
-	Position float64
-	Length   float64
-
-	ArtURL string
+	Length      float64
+	ArtURL      string
 }
 
 func format(data *mpdState) string {
@@ -45,17 +45,45 @@ func format(data *mpdState) string {
 		return ""
 	}
 	r := "\nM P D\n${hr}\n"
+	r += formatCurrentSong(data)
+	r += formatUpcomingSongs(data)
 	// addArt(&r, data)
-	addTrackInfo(&r, "Title", data.CurrentTrack.Title)
-	addTrackInfo(&r, "Artists", data.CurrentTrack.Artist)
-	addTrackInfo(&r, "Album", data.CurrentTrack.Album)
-	addTrackInfo(&r, "Genres", data.CurrentTrack.Genre)
-	addTrackInfo(&r, "Playtime", fmt.Sprintf("%s / %s", asTimecode(data.CurrentTrack.Position), asTimecode(data.CurrentTrack.Length)))
 	return r
 }
 
+func formatCurrentSong(allData *mpdState) string {
+	data := allData.Tracks[int(allData.CurrentIdx)]
+	r := ""
+	addTrackInfo(&r, "Title", data.Title)
+	addTrackInfo(&r, "Artists", data.Artist)
+	addTrackInfo(&r, "Album", data.Album)
+	// addTrackInfo(&r, "Genres", data.Genre)
+	addTrackInfo(&r, "Playtime", fmt.Sprintf("%s / %s", asTimecode(allData.CurrentElapsed), asTimecode(data.Length)))
+	addBar(&r, allData.CurrentElapsed/data.Length)
+	return r
+}
+
+func formatUpcomingSongs(allData *mpdState) string {
+	songsRemaining := len(allData.Tracks) - (int(allData.CurrentIdx) + 1)
+	r := fmt.Sprintf("${hr}\n%d Songs left, next up...\n", songsRemaining)
+	startIdx := int(allData.CurrentIdx) + 1
+	// endIdx := startIdx + 5
+	// if endIdx > len(allData.Tracks) {
+	// 	endIdx = len(allData.Tracks)
+	// }
+	upcomingTracks := allData.Tracks[startIdx:]
+	for _, track := range upcomingTracks {
+		r += "•" + formatSongMinimal(&track)
+	}
+	return r
+}
+
+func formatSongMinimal(track *track) string {
+	return fmt.Sprintf("%s | %s", track.Title, track.Artist) + "\n"
+}
+
 func hasData(data *mpdState) bool {
-	return data.CurrentTrack.Title != ""
+	return len(data.Tracks) > 0
 }
 
 // func addArt(to *string, data *mpdState) {
@@ -75,6 +103,17 @@ func addTrackInfo(to *string, name string, data string) {
 		name, scroll(data, 20))
 }
 
+func addBar(to *string, percent float64) {
+	if percent < 0.0 {
+		percent = 0.0
+	} else if percent > 1.0 {
+		percent = 1.0
+	}
+	val := percent * 100
+	fmt.Fprintln(os.Stderr, val)
+	*to += fmt.Sprintf("${execbar expr %.2f}\n", val)
+}
+
 func getData() (*mpdState, error) {
 	conn, err := mpd.Dial("tcp", "127.0.0.1:6600")
 	if err != nil {
@@ -82,20 +121,7 @@ func getData() (*mpdState, error) {
 	}
 	defer conn.Close()
 
-	// getTracks(conn)
-
-	currentTrack, err := getCurrentTrack(conn)
-	if err != nil {
-		return nil, fmt.Errorf("could not get current track: %w", err)
-	}
-
-	return &mpdState{
-		CurrentTrack: *currentTrack,
-	}, nil
-}
-
-func getCurrentTrack(conn *mpd.Client) (*currentTrack, error) {
-	metadata, err := conn.CurrentSong()
+	allSongs, err := conn.PlaylistInfo(-1, -1)
 	if err != nil {
 		return nil, fmt.Errorf("mpd currentSong error: %w", err)
 	}
@@ -103,12 +129,23 @@ func getCurrentTrack(conn *mpd.Client) (*currentTrack, error) {
 	if err != nil {
 		return nil, fmt.Errorf("mpd status error: %w", err)
 	}
+	fmt.Fprint(os.Stderr, status)
 
-	// allSongs, _ := conn.PlaylistInfo(-1, -1)
-	// fmt.Fprintf(os.Stderr, "%+v\n", metadata["elapsed"])
-	fmt.Fprintf(os.Stderr, "%+v\n", metadata)
+	result := mpdState{}
 
-	return &currentTrack{
+	for _, song := range allSongs {
+		track := getTrack(song)
+		result.Tracks = append(result.Tracks, *track)
+	}
+
+	result.CurrentIdx = strToInt64(status["song"])
+	result.CurrentElapsed = strToFloat64(status["elapsed"])
+
+	return &result, nil
+}
+
+func getTrack(metadata mpd.Attrs) *track {
+	return &track{
 		Title:       metadata["Title"],
 		Album:       metadata["Album"],
 		Artist:      metadata["Artist"],
@@ -117,11 +154,10 @@ func getCurrentTrack(conn *mpd.Client) (*currentTrack, error) {
 		DiscNumber:  strToInt64(metadata["DiscNumber"]),
 		Year:        metadata["OriginalDate"],
 
-		Length:   strToFloat64(metadata["duration"]),
-		Position: strToFloat64(status["elapsed"]),
+		Length: strToFloat64(metadata["duration"]),
 
 		// ArtURL: safeAsString(metadata["mpris:artUrl"]),
-	}, nil
+	}
 }
 
 // func getTracks(conn *mpd.Client) {
@@ -141,15 +177,20 @@ func asTimecode(val float64) string {
 }
 
 func scroll(val string, l int64) string {
+	if int64(len(val)) <= l {
+		return val
+	}
+	diff := int64(len(val)) - l
+	unix := time.Now().Unix()
+	step := unix % diff
+	return val[step : l+step]
+}
+
+func etcetera(val string, l int64) string {
 	if int64(len(val)) < l {
 		return val
 	}
-	repeated := val + "/"
-	repeated = repeated + repeated
-	repeated = repeated + repeated
-	unix := time.Now().Unix()
-	step := unix % (l + 1)
-	return repeated[step : l+step]
+	return val[:l-3] + "..."
 }
 
 func strToInt64(val string) int64 {
