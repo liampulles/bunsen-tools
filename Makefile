@@ -19,4 +19,5 @@ pre-commit: update clean coverage.txt inspect
 	go mod tidy
 clean:
 	rm -f ${GOBIN}/conky-mpd
+	rm -f ${GOBIN}/mpd-artfetch
 	rm -f coverage.txt

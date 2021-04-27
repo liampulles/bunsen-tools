@@ -12,7 +12,7 @@ func Format(data *domain.MpdState) string {
 	if !hasData(data) {
 		return ""
 	}
-	r := "\nM P D\n${hr}\n"
+	r := fmt.Sprintf("\n%sM P D ${hr}\n", c(0))
 	r += formatCurrentSong(data)
 	r += formatUpcomingSongs(data)
 	// addArt(&r, data)
@@ -22,6 +22,7 @@ func Format(data *domain.MpdState) string {
 func formatCurrentSong(allData *domain.MpdState) string {
 	data := allData.Tracks[int(allData.CurrentIdx)]
 	r := ""
+	addArt(&r)
 	addTrackInfo(&r, "Title", data.Title)
 	addTrackInfo(&r, "Artists", data.Artist)
 	addTrackInfo(&r, "Album", data.Album)
@@ -33,42 +34,38 @@ func formatCurrentSong(allData *domain.MpdState) string {
 
 func formatUpcomingSongs(allData *domain.MpdState) string {
 	songsRemaining := len(allData.Tracks) - (int(allData.CurrentIdx) + 1)
-	r := fmt.Sprintf("${hr}\n%d Songs left, next up...\n", songsRemaining)
+	r := fmt.Sprintf("%s${voffset -9}${hr}\n${alignr}. . . %d   S O N G S   L E F T\n", c(0), songsRemaining)
 	startIdx := int(allData.CurrentIdx) + 1
-	// endIdx := startIdx + 5
-	// if endIdx > len(allData.Tracks) {
-	// 	endIdx = len(allData.Tracks)
-	// }
-	upcomingTracks := allData.Tracks[startIdx:]
-	for _, track := range upcomingTracks {
-		r += "•" + formatSongMinimal(&track)
+	endIdx := startIdx + 37
+	if endIdx > len(allData.Tracks) {
+		endIdx = len(allData.Tracks)
+	}
+	upcomingTracks := allData.Tracks[startIdx:endIdx]
+	for n, track := range upcomingTracks {
+		r += fmt.Sprintf("%s%d. %s", c(0), n+1, formatSongMinimal(&track))
 	}
 	return r
 }
 
 func formatSongMinimal(track *domain.Track) string {
-	return fmt.Sprintf("%s | %s", track.Title, track.Artist) + "\n"
+	return fmt.Sprintf("%s%s %sby %s%s", c(1), track.Title, c(0), c(2), track.Artist) + "\n"
 }
 
 func hasData(data *domain.MpdState) bool {
 	return len(data.Tracks) > 0
 }
 
-// func addArt(to *string, data *domain.MpdState) {
-// 	if data.CurrentTrack.ArtURL == "" {
-// 		return
-// 	}
-// 	*to += fmt.Sprintf("${image %s -p 0,135 -s 200x200}${voffset 200}\n",
-// 		asPath(data.CurrentTrack.ArtURL))
-// }
+func addArt(to *string) {
+	*to += "${image /tmp/mpd-albumart.jpg -p 0,105 -s 200x200}${voffset 190}\n"
+}
 
 func addTrackInfo(to *string, name string, data string) {
 
 	if data == "" {
 		return
 	}
-	*to += fmt.Sprintf("%s:${alignr}%s\n",
-		name, scroll(data, 20))
+	*to += fmt.Sprintf("%s%s:${alignr}%s%s\n",
+		c(1), name, c(2), scroll(data, 20))
 }
 
 func addBar(to *string, percent float64) {
@@ -78,7 +75,7 @@ func addBar(to *string, percent float64) {
 		percent = 1.0
 	}
 	val := percent * 100
-	*to += fmt.Sprintf("${execbar expr %.2f}\n", val)
+	*to += fmt.Sprintf("%s${execbar expr %.2f}\n", c(2), val)
 }
 
 func asTimecode(val float64) string {
@@ -95,12 +92,24 @@ func scroll(val string, l int64) string {
 	diff := int64(len(val)) - l
 	unix := time.Now().Unix()
 	step := unix % diff
-	return val[step : l+step]
+	return val[step : l+step+1]
 }
 
 func etcetera(val string, l int64) string {
-	if int64(len(val)) < l {
+	if int64(len(val)) <= l {
 		return val
 	}
 	return val[:l-3] + "..."
+}
+
+// Change the color.
+func c(n int) string {
+	return fmt.Sprintf("${color%d}", n)
+}
+
+func max(val string, n int) string {
+	if len(val) <= n {
+		return val
+	}
+	return val[:n]
 }
