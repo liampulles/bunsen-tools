@@ -85,21 +85,21 @@ func asTimecode(val float64) string {
 	return fmt.Sprintf("%01d:%02d", mins, secs)
 }
 
-func scroll(val string, l int64) string {
-	if int64(len(val)) <= l {
+func scroll(val string, l int) string {
+	if rlen(val) <= l {
 		return val
 	}
-	diff := int64(len(val)) - l
+	diff := rlen(val) - l
 	unix := time.Now().Unix()
-	step := unix % diff
-	return val[step : l+step+1]
+	step := int(unix % int64(diff))
+	return subs(val, step, l+step+1)
 }
 
-func etcetera(val string, l int64) string {
-	if int64(len(val)) <= l {
+func etcetera(val string, l int) string {
+	if rlen(val) <= l {
 		return val
 	}
-	return val[:l-3] + "..."
+	return subs(val, 0, l-3) + "..."
 }
 
 // Change the color.
@@ -108,8 +108,19 @@ func c(n int) string {
 }
 
 func max(val string, n int) string {
-	if len(val) <= n {
+	if rlen(val) <= n {
 		return val
 	}
-	return val[:n]
+	return subs(val, 0, n)
+}
+
+// Allows to get a substring correctly (dealing with unicode runes).
+func subs(s string, start int, end int) string {
+	r := []rune(s)
+	return string(r[start:end])
+}
+
+// Gets the rune length of a string.
+func rlen(s string) int {
+	return len([]rune(s))
 }
