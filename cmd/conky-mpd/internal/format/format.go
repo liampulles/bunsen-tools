@@ -28,7 +28,8 @@ func formatCurrentSong(allData *domain.MpdState) string {
 	addTrackInfo(&r, "Album", data.Album)
 	// addTrackInfo(&r, "Genres", data.Genre)
 	addTrackInfo(&r, "Playtime", fmt.Sprintf("%s / %s", asTimecode(allData.CurrentElapsed), asTimecode(data.Length)))
-	addBar(&r, allData.CurrentElapsed/data.Length)
+	addMPDBar(&r)
+	// addBar(&r, allData.CurrentElapsed/data.Length)
 	return r
 }
 
@@ -76,6 +77,10 @@ func addBar(to *string, percent float64) {
 	}
 	val := percent * 100
 	*to += fmt.Sprintf("%s${execbar expr %.2f}\n", c(2), val)
+}
+
+func addMPDBar(to *string) {
+	*to += fmt.Sprintf("%s${mpd_bar}\n", c(2))
 }
 
 func asTimecode(val float64) string {
