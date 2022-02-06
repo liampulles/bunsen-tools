@@ -2,6 +2,7 @@ package format
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/liampulles/bunsen-tools/cmd/conky-mpd/internal/domain"
@@ -49,7 +50,7 @@ func formatUpcomingSongs(allData *domain.MpdState) string {
 }
 
 func formatSongMinimal(track *domain.Track) string {
-	return fmt.Sprintf("%s%s %sby %s%s", c(1), track.Title, c(0), c(2), track.Artist) + "\n"
+	return fmt.Sprintf("%s%s %sby %s%s", c(1), escapeString(track.Title), c(0), c(2), escapeString(track.Artist)) + "\n"
 }
 
 func hasData(data *domain.MpdState) bool {
@@ -61,12 +62,11 @@ func addArt(to *string) {
 }
 
 func addTrackInfo(to *string, name string, data string) {
-
 	if data == "" {
 		return
 	}
 	*to += fmt.Sprintf("%s%s:${alignr}%s%s\n",
-		c(1), name, c(2), scroll(data, 20))
+		c(1), name, c(2), escapeString(scroll(data, 20)))
 }
 
 func addBar(to *string, percent float64) {
@@ -81,6 +81,12 @@ func addBar(to *string, percent float64) {
 
 func addMPDBar(to *string) {
 	*to += fmt.Sprintf("%s${mpd_bar}\n", c(2))
+}
+
+// Some symbols are interpreted by conky, so we need to replace them with a unicode sequence so they are rednered properly.
+func escapeString(s string) string {
+	out := strings.ReplaceAll(s, "#", "\\#")
+	return out
 }
 
 func asTimecode(val float64) string {
