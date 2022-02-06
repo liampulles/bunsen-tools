@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"io"
+	"log"
+	"log/syslog"
 	"os"
 	"os/exec"
 	"path"
@@ -11,31 +13,38 @@ import (
 )
 
 func main() {
-	if err := run(os.Args[1]); err != nil {
-		fmt.Printf("ERROR: %s\n", err)
-		os.Exit(1)
-	}
-	os.Exit(0)
+	setupLogger()
+	run(os.Args[1])
 }
 
-func run(libraryDir string) error {
+func setupLogger() {
+	sw, err := syslog.New(syslog.LOG_INFO, "mpd-artfetch")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "could not establish syslog connection - failing")
+		panic(err)
+	}
+	mw := io.MultiWriter(os.Stderr, sw)
+	log.SetOutput(mw)
+}
+
+func run(libraryDir string) {
 	w, err := mpd.NewWatcher("tcp", ":6600", "", "player")
 	if err != nil {
-		return fmt.Errorf("watcher construct error: %w", err)
+		log.Fatalf("watcher construct error: %s", err.Error())
 	}
 	defer w.Close()
 
 	// Do once to start off with.
 	if err := saveArt(libraryDir); err != nil {
-		fmt.Fprintf(os.Stderr, "save art error: %s\n", err.Error())
+		log.Printf("save art error: %s\n", err.Error())
 	}
 
+	// Then run forever.
 	for range w.Event {
 		if err := saveArt(libraryDir); err != nil {
-			fmt.Fprintf(os.Stderr, "save art error: %s\n", err.Error())
+			log.Printf("save art error: %s\n", err.Error())
 		}
 	}
-	return nil
 }
 
 func saveArt(libraryDir string) error {
@@ -50,18 +59,11 @@ func saveArt(libraryDir string) error {
 		return fmt.Errorf("current song error: %w", err)
 	}
 	uri := path.Join(libraryDir, attrs["file"])
+	log.Printf("current song path: %s", uri)
 
 	if err := savePictureFFMPEG(uri); err != nil {
 		return fmt.Errorf("save picture error: %w", err)
 	}
-	// bytes, err := readPicture(conn, uri)
-	// if err != nil {
-	// 	return fmt.Errorf("album art error: %w", err)
-	// }
-
-	// if err := ioutil.WriteFile("/tmp/mpd-albumart.jpg", bytes, 0644); err != nil {
-	// 	return fmt.Errorf("file write error: %w", err)
-	// }
 	return nil
 }
 
@@ -95,24 +97,4 @@ func copyDefault() error {
 		return fmt.Errorf("copy error: %w", err)
 	}
 	return nil
-}
-
-func readPicture(conn *mpd.Client, uri string) ([]byte, error) {
-	offset := 0
-	var data []byte
-	for {
-		// Read the data in chunks
-		chunk, size, err := conn.Command("readpicture %s %d", uri, offset).Binary()
-		if err != nil {
-			return nil, err
-		}
-
-		// Accumulate the data
-		data = append(data, chunk...)
-		offset = len(data)
-		if offset >= size {
-			break
-		}
-	}
-	return data, nil
 }
