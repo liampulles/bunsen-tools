@@ -13,8 +13,7 @@ func Format(data *domain.MpdState) string {
 	if !hasData(data) {
 		return ""
 	}
-	r := fmt.Sprintf("\n%sM P D ${hr}\n", c(0))
-	r += formatCurrentSong(data)
+	r := formatCurrentSong(data)
 	r += formatUpcomingSongs(data)
 	// addArt(&r, data)
 	return r
@@ -50,7 +49,7 @@ func formatUpcomingSongs(allData *domain.MpdState) string {
 }
 
 func formatSongMinimal(track *domain.Track) string {
-	return fmt.Sprintf("%s%s %sby %s%s", c(1), escapeString(track.Title), c(0), c(2), escapeString(track.Artist)) + "\n"
+	return fmt.Sprintf("%s%s %sby %s%s", c(1), escapeString(track.Title), c(0), c(0), escapeString(track.Artist)) + "\n"
 }
 
 func hasData(data *domain.MpdState) bool {
@@ -58,7 +57,7 @@ func hasData(data *domain.MpdState) bool {
 }
 
 func addArt(to *string) {
-	*to += "${image /tmp/mpd-albumart.jpg -p 0,105 -s 200x200}${voffset 190}\n"
+	*to += "${image /tmp/mpd-albumart.jpg -p 0,105 -s 200x200 -n}${voffset 190}\n"
 }
 
 func addTrackInfo(to *string, name string, data string) {
@@ -66,7 +65,7 @@ func addTrackInfo(to *string, name string, data string) {
 		return
 	}
 	*to += fmt.Sprintf("%s%s:${alignr}%s%s\n",
-		c(1), name, c(2), escapeString(scroll(data, 20)))
+		c(1), name, c(0), escapeString(scroll(data, 20)))
 }
 
 func addBar(to *string, percent float64) {
@@ -76,11 +75,11 @@ func addBar(to *string, percent float64) {
 		percent = 1.0
 	}
 	val := percent * 100
-	*to += fmt.Sprintf("%s${execbar expr %.2f}\n", c(2), val)
+	*to += fmt.Sprintf("%s${execbar expr %.2f}\n", c(0), val)
 }
 
 func addMPDBar(to *string) {
-	*to += fmt.Sprintf("%s${mpd_bar}\n", c(2))
+	*to += fmt.Sprintf("%s${mpd_bar}\n", c(0))
 }
 
 // Some symbols are interpreted by conky, so we need to replace them with a unicode sequence so they are rednered properly.
@@ -115,6 +114,9 @@ func etcetera(val string, l int) string {
 
 // Change the color.
 func c(n int) string {
+	if n == 0 {
+		return "${color}"
+	}
 	return fmt.Sprintf("${color%d}", n)
 }
 
